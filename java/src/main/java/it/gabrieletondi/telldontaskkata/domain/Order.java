@@ -11,11 +11,11 @@ public class Order {
     private List<OrderItem> items;
     private BigDecimal tax;
     private OrderStatus status;
-    private int id;
+    private Integer id;
 
     public Order() {}
 
-    public Order(BigDecimal total, String currency, List<OrderItem> items, BigDecimal tax, OrderStatus status, int id) {
+    public Order(BigDecimal total, String currency, List<OrderItem> items, BigDecimal tax, OrderStatus status, Integer id) {
         this.total = total;
         this.currency = currency;
         this.items = items;
@@ -64,11 +64,11 @@ public class Order {
         this.status = status;
     }
 
-    public int getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 

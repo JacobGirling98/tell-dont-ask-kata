@@ -9,9 +9,10 @@ import it.gabrieletondi.telldontaskkata.repository.ProductCatalog;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.math.BigDecimal.valueOf;
-import static java.math.RoundingMode.HALF_UP;
 
 public class OrderCreationUseCase {
     private final OrderRepository orderRepository;
@@ -22,38 +23,48 @@ public class OrderCreationUseCase {
         this.productCatalog = productCatalog;
     }
 
-    public void run(SellItemsRequest request) {
-        Order order = new Order();
-        order.setStatus(OrderStatus.CREATED);
-        order.setItems(new ArrayList<>());
-        order.setCurrency("EUR");
-        order.setTotal(new BigDecimal("0.00"));
-        order.setTax(new BigDecimal("0.00"));
-
-        for (SellItemRequest itemRequest : request.getRequests()) {
-            Product product = productCatalog.getByName(itemRequest.getProductName());
-
-            if (product == null) {
-                throw new UnknownProductException();
-            }
-            else {
-                final BigDecimal unitaryTax = product.getPrice().divide(valueOf(100)).multiply(product.getCategory().getTaxPercentage()).setScale(2, HALF_UP);
-                final BigDecimal unitaryTaxedAmount = product.getPrice().add(unitaryTax).setScale(2, HALF_UP);
-                final BigDecimal taxedAmount = unitaryTaxedAmount.multiply(BigDecimal.valueOf(itemRequest.getQuantity())).setScale(2, HALF_UP);
-                final BigDecimal taxAmount = unitaryTax.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
-
-                final OrderItem orderItem = new OrderItem();
-                orderItem.setProduct(product);
-                orderItem.setQuantity(itemRequest.getQuantity());
-                orderItem.setTax(taxAmount);
-                orderItem.setTaxedAmount(taxedAmount);
-                order.getItems().add(orderItem);
-
-                order.setTotal(order.getTotal().add(taxedAmount));
-                order.setTax(order.getTax().add(taxAmount));
-            }
+    private Product fetchProductOrThrow(String productName) {
+        Product product = productCatalog.getByName(productName);
+        if (product == null) {
+            throw new UnknownProductException();
         }
+        return product;
+    }
 
+    private OrderItem orderItemFrom(SellItemRequest itemRequest) {
+        Product product = fetchProductOrThrow(itemRequest.getProductName());
+
+        final BigDecimal taxedAmount = product.taxedAmount(itemRequest.getQuantity());
+        final BigDecimal taxAmount = product.taxAmount(itemRequest.getQuantity());
+
+        return new OrderItem(
+                product,
+                itemRequest.getQuantity(),
+                taxedAmount,
+                taxAmount
+        );
+    }
+
+    private BigDecimal totalFrom(List<OrderItem> orderItems) {
+        return orderItems.stream().map(OrderItem::getTaxedAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal taxFrom(List<OrderItem> orderItems) {
+        return orderItems.stream().map(OrderItem::getTax).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public void run(SellItemsRequest request) {
+        List<OrderItem> orders = request.stream()
+                .map(this::orderItemFrom)
+                .collect(Collectors.toList());
+        Order order = new Order(
+                totalFrom(orders),
+                "EUR",
+                orders,
+                taxFrom(orders),
+                OrderStatus.CREATED,
+                null
+        );
         orderRepository.save(order);
     }
 }
