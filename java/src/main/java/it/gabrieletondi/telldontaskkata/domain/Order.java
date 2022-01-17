@@ -1,5 +1,7 @@
 package it.gabrieletondi.telldontaskkata.domain;
 
+import it.gabrieletondi.telldontaskkata.useCase.OrderApprovalRequest;
+
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -10,6 +12,17 @@ public class Order {
     private BigDecimal tax;
     private OrderStatus status;
     private int id;
+
+    public Order() {}
+
+    public Order(BigDecimal total, String currency, List<OrderItem> items, BigDecimal tax, OrderStatus status, int id) {
+        this.total = total;
+        this.currency = currency;
+        this.items = items;
+        this.tax = tax;
+        this.status = status;
+        this.id = id;
+    }
 
     public BigDecimal getTotal() {
         return total;
@@ -58,4 +71,36 @@ public class Order {
     public void setId(int id) {
         this.id = id;
     }
+
+    private boolean statusEquals(OrderStatus shipped) {
+        return status.equals(shipped);
+    }
+
+    public boolean isShipped() {
+        return statusEquals(OrderStatus.SHIPPED);
+    }
+
+    public boolean isRejected() {
+        return statusEquals(OrderStatus.REJECTED);
+    }
+
+    public boolean isApproved() {
+        return statusEquals(OrderStatus.APPROVED);
+    }
+
+    public boolean isCreated() {
+        return statusEquals(OrderStatus.CREATED);
+    }
+
+    public static Order updateFrom(Order order, OrderApprovalRequest request) {
+        return new Order(
+                order.total,
+                order.currency,
+                order.items,
+                order.tax,
+                request.isApproved() ? OrderStatus.APPROVED : OrderStatus.REJECTED,
+                order.id
+        );
+    }
+
 }
